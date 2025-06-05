@@ -70,6 +70,8 @@ Data yang digunakan dalam proyek ini adalah dataset rating dan metadata film dar
 * **Kondisi Data:**
     * Data `ratings.csv` berisi informasi `userId`, `movieId`, `rating`, dan `timestamp`.
     * Data `movies.csv` berisi `movieId`, `title`, dan `genres`. Kolom `genres` dapat berisi beberapa genre yang dipisahkan oleh `|`. Terdapat juga potensi nilai kosong pada kolom `genres` yang perlu ditangani nantinya dengan mengubah isinya menjadi `Unknown`.
+    * Tidak terdapat missing values.
+    * Tidak terdapat duplikasi data.
 
 * **Tautan Sumber Data:**
     * Dataset ini dapat diuakses dari situs kaggle dengan author parasharmanas: [Kaggle](https://www.kaggle.com/datasets/parasharmanas/movie-recommendation-system).
