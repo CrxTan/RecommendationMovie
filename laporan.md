@@ -69,7 +69,7 @@ Data yang digunakan dalam proyek ini adalah dataset rating dan metadata film dar
 
 * **Kondisi Data:**
     * Data `ratings.csv` berisi informasi `userId`, `movieId`, `rating`, dan `timestamp`.
-    * Data `movies.csv` berisi `movieId`, `title`, dan `genres`. Kolom `genres` dapat berisi beberapa genre yang dipisahkan oleh `|`. Terdapat juga potensi nilai kosong pada kolom `genres` yang perlu ditangani.
+    * Data `movies.csv` berisi `movieId`, `title`, dan `genres`. Kolom `genres` dapat berisi beberapa genre yang dipisahkan oleh `|`. Terdapat juga potensi nilai kosong pada kolom `genres` yang perlu ditangani nantinya dengan mengubah isinya menjadi `Unknown`.
 
 * **Tautan Sumber Data:**
     * Dataset ini dapat diuakses dari situs kaggle dengan author parasharmanas: [Kaggle](https://www.kaggle.com/datasets/parasharmanas/movie-recommendation-system).
@@ -88,6 +88,58 @@ Data yang digunakan dalam proyek ini adalah dataset rating dan metadata film dar
 * **Exploratory Data Analysis (EDA) dan Insight:**
 
     Melalui tahapan EDA, beberapa insight kunci telah diidentifikasi dari dataset:
+
+   ### Outlier Check
+   * **Boxplot Rating menggunakan IQR**
+     ![boxplot](https://github.com/user-attachments/assets/cbccd677-d983-4453-9e83-18a9e4b35bd6)
+
+        Analisis:
+
+     - Kotak (Box):
+             - Sisi kiri kotak (Q1) berada di sekitar 3.
+             - Sisi kanan kotak (Q3) berada di sekitar 4.
+            - Artinya, 50% dari rating berada antara 3 dan 4.
+         - Garis Tengah dalam Kotak (Median/Q2): Garis vertikal di dalam kotak (median) berada di sekitar 3.5. Ini menunjukkan bahwa sebagian besar rating cenderung mengumpul di sisi kanan distribusi (nilai yang lebih tinggi) dalam kotak IQR.
+         - Whiskers:
+             - Whisker kiri membentang hingga sekitar 2.
+             - Whisker kanan membentang hingga 5.
+
+         Outlier: Terlihat ada beberapa titik individual di sebelah kiri whisker kiri, yaitu pada nilai 0.5 dan 1. Ini adalah outlier yang terdeteksi. Nilai rating 0.5 dan 1 jauh lebih rendah dibandingkan sebagian besar rating lainnya.
+
+     * **Boxplot Timestamp menggunakan IQR**
+       ![boxplot](https://github.com/user-attachments/assets/ea8dbb56-98bf-4620-8885-9029d2455938)
+
+          Analisis:
+
+        - Kotak (Box): Kotak biru yang tebal mewakili IQR, yaitu rentang antara kuartil pertama (Q1) dan kuartil ketiga (Q3).
+          - Sisi kiri kotak (Q1) berada di sekitar 1.05×109.
+          - Sisi kanan kotak (Q3) berada di sekitar 1.45×109.
+          - Ini berarti 50% data tengah timestamp berada dalam rentang ini.
+        - Garis Tengah dalam Kotak (Median/Q2): Garis vertikal di dalam kotak (median) berada tepat di tengah kotak, sekitar 1.25×109. Ini menunjukkan bahwa distribusi timestamp cukup simetris di bagian tengahnya.
+        - Whiskers: Garis horizontal yang membentang dari kotak disebut whiskers.
+          - Whisker kiri membentang hingga sekitar 0.8×109.
+          - Whisker kanan membentang hingga sekitar 1.6×109.
+          - Whiskers ini biasanya menunjukkan rentang data dalam 1.5×IQR dari Q1 dan Q3.
+
+         Outlier: Tidak ada titik individual yang terlihat di luar whiskers. Ini menunjukkan bahwa berdasarkan metode deteksi outlier IQR standar, tidak ada outlier yang terdeteksi secara signifikan dalam kolom timestamp. Data timestamp cenderung terdistribusi dengan baik tanpa nilai ekstrem yang jauh.
+
+
+       **Insight Keseluruhan**
+
+         - Distribusi timestamp cenderung normal/simetris dan bersih dari outlier. Ini adalah kabar baik karena data waktu biasanya sangat penting dan outlier dapat menunjukkan masalah dalam pengumpulan data atau peristiwa yang sangat jarang terjadi. Dengan distribusi yang simetris, rata-rata dan median akan menjadi ukuran pemusatan yang representatif.
+         - Distribusi rating cenderung miring ke kiri (negatively skewed) dengan outlier di sisi rendah.
+           - Kemiringan: Median rating (3.5) lebih dekat ke Q3 (4) daripada ke Q1 (3), dan sebagian besar data terkonsentrasi di nilai rating yang lebih tinggi (3−4). Ini menunjukkan bahwa mayoritas pengguna memberikan rating yang relatif tinggi (cenderung 3 ke atas).
+           - Outlier: Adanya outlier pada rating 0.5 dan 1 adalah hal yang signifikan.
+               - Potensi Interpretasi Outlier:
+                   - Data Entry Error: Bisa jadi kesalahan saat memasukkan data.
+                   - Produk/Layanan Buruk: Menunjukkan pengalaman yang sangat buruk dari sebagian kecil pengguna.
+                   - Uji Coba/Bot: Mungkin ada rating awal atau rating dari bot/sistem yang tidak representatif.
+                   - Pengguna yang Sangat Kritis: Sebagian kecil pengguna yang memberikan rating sangat rendah secara konsisten.
+                   - Bug/Masalah Teknis: Pengguna memberikan rating rendah karena mengalami masalah teknis dengan produk/layanan.
+
+         Data rating akan diubah skalanya ke dalam rentang antara 0 dan 1 menggunakan metode Min-Max Scaling. Hal ini bertujuan untuk menormalisasi nilai rating sehingga semua nilai, termasuk outlier, berada dalam rentang yang seragam, yang dapat membantu algoritma sistem rekomendasi yang sensitif terhadap skala data.      
+
+
     ### Univariate Analysis EDA
     * **Frekuensi Genre Film:** 
       ![Univariate](https://github.com/user-attachments/assets/ab47ea19-a492-4249-b0e9-f6f99cee2b1c)
@@ -479,7 +531,7 @@ Data yang digunakan dalam proyek ini adalah dataset rating dan metadata film dar
 
 Tahap Data Preparation adalah langkah krusial untuk mengubah data mentah menjadi format yang sesuai dan optimal untuk proses *modeling* sistem rekomendasi, disini saya melakukan efisiensi dan pembatasan dataset menjadi 15000 records saja dan memuat kembali datasetnya. Teknik-teknik yang diterapkan dan alasannya adalah sebagai berikut:
 
-1.  **Pengisian Nilai Kosong pada Genre (`movies['genres'].fillna('')`)**
+1.  **Pengisian Nilai Kosong pada Genre (`movies['genres'].fillna('Unknown')`)**
     * **Teknik:** Imputasi dengan string kosong.
     * **Proses:** Mengganti setiap nilai `NaN` (Not a Number) dalam kolom `genres` di DataFrame `movies` dengan string kosong (`''`).
     * **Alasan:** `TfidfVectorizer` (yang digunakan untuk Content-Based Filtering) mengharapkan input berupa string. Nilai `NaN` dapat menyebabkan error atau perilaku yang tidak terduga. Menggantinya dengan string kosong memastikan bahwa setiap entri dapat diproses.
