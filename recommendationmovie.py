@@ -111,7 +111,90 @@ print(movies.isnull().sum())
 print("\nRating Dataset:")
 print(rating.isnull().sum())
 
-"""Pengecekan diatas menunjukan dari kedua dataframe tidak memiliki missing values.
+"""Pengecekan diatas menunjukan dari kedua dataframe tidak memiliki missing values."""
+
+# Function to detect and visualize outliers using IQR
+def iqr_outlier_analysis(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
+
+    # Visualization
+    plt.figure(figsize=(10, 6))
+    sns.boxplot(x=df[column])
+    plt.title(f'Box Plot of {column} with IQR Outlier Detection')
+    plt.xlabel(column)
+    plt.show()
+
+
+print("Outlier analysis for 'rating' column in rating dataframe:")
+iqr_outlier_analysis(rating, 'rating')
+
+print("\nOutlier analysis for 'timestamp' column in rating dataframe:")
+iqr_outlier_analysis(rating, 'timestamp')
+
+"""**Analisis Box Plot : rating**
+
+
+Judul: "Box Plot of rating with IQR Outlier Detection"
+
+Analisis:
+
+- Kotak (Box):
+    - Sisi kiri kotak (Q1) berada di sekitar 3.
+    - Sisi kanan kotak (Q3) berada di sekitar 4.
+    - Artinya, 50% dari rating berada antara 3 dan 4.
+- Garis Tengah dalam Kotak (Median/Q2): Garis vertikal di dalam kotak (median) berada di sekitar 3.5. Ini menunjukkan bahwa sebagian besar rating cenderung mengumpul di sisi kanan distribusi (nilai yang lebih tinggi) dalam kotak IQR.
+- Whiskers:
+    - Whisker kiri membentang hingga sekitar 2.
+    - Whisker kanan membentang hingga 5.
+
+Outlier: Terlihat ada beberapa titik individual di sebelah kiri whisker kiri, yaitu pada nilai 0.5 dan 1. Ini adalah outlier yang terdeteksi. Nilai rating 0.5 dan 1 jauh lebih rendah dibandingkan sebagian besar rating lainnya.
+
+**Analisis Box Plot : timestamp**
+
+
+Judul: "Box Plot of timestamp with IQR Outlier Detection"
+
+Analisis:
+
+  - Kotak (Box): Kotak biru yang tebal mewakili IQR, yaitu rentang antara kuartil pertama (Q1) dan kuartil ketiga (Q3).
+    - Sisi kiri kotak (Q1) berada di sekitar 1.05×109.
+    - Sisi kanan kotak (Q3) berada di sekitar 1.45×109.
+    - Ini berarti 50% data tengah timestamp berada dalam rentang ini.
+  - Garis Tengah dalam Kotak (Median/Q2): Garis vertikal di dalam kotak (median) berada tepat di tengah kotak, sekitar 1.25×109. Ini menunjukkan bahwa distribusi timestamp cukup simetris di bagian tengahnya.
+  - Whiskers: Garis horizontal yang membentang dari kotak disebut whiskers.
+    - Whisker kiri membentang hingga sekitar 0.8×109.
+    - Whisker kanan membentang hingga sekitar 1.6×109.
+    - Whiskers ini biasanya menunjukkan rentang data dalam 1.5×IQR dari Q1 dan Q3.
+
+Outlier: Tidak ada titik individual yang terlihat di luar whiskers. Ini menunjukkan bahwa berdasarkan metode deteksi outlier IQR standar, tidak ada outlier yang terdeteksi secara signifikan dalam kolom timestamp. Data timestamp cenderung terdistribusi dengan baik tanpa nilai ekstrem yang jauh.
+
+
+**Insight Keseluruhan**
+
+- Distribusi timestamp cenderung normal/simetris dan bersih dari outlier. Ini adalah kabar baik karena data waktu biasanya sangat penting dan outlier dapat menunjukkan masalah dalam pengumpulan data atau peristiwa yang sangat jarang terjadi. Dengan distribusi yang simetris, rata-rata dan median akan menjadi ukuran pemusatan yang representatif.
+- Distribusi rating cenderung miring ke kiri (negatively skewed) dengan outlier di sisi rendah.
+  - Kemiringan: Median rating (3.5) lebih dekat ke Q3 (4) daripada ke Q1 (3), dan sebagian besar data terkonsentrasi di nilai rating yang lebih tinggi (3−4). Ini menunjukkan bahwa mayoritas pengguna memberikan rating yang relatif tinggi (cenderung 3 ke atas).
+  - Outlier: Adanya outlier pada rating 0.5 dan 1 adalah hal yang signifikan.
+      - Potensi Interpretasi Outlier:
+          - Data Entry Error: Bisa jadi kesalahan saat memasukkan data.
+          - Produk/Layanan Buruk: Menunjukkan pengalaman yang sangat buruk dari sebagian kecil pengguna.
+          - Uji Coba/Bot: Mungkin ada rating awal atau rating dari bot/sistem yang tidak representatif.
+          - Pengguna yang Sangat Kritis: Sebagian kecil pengguna yang memberikan rating sangat rendah secara konsisten.
+          - Bug/Masalah Teknis: Pengguna memberikan rating rendah karena mengalami masalah teknis dengan produk/layanan.
+
+Menurut saya, outlier pada data rating adalah data yang valid dan diperlukan agar sistem rekomendasi yang akan dihasilkan lebih akurat karena adanya ulasan negatif rating dari sebagian kecil pengguna.
+"""
+
+movies['genres'].unique
+
+"""Pada no Genres listed akan dilakukan pengisian dengan Unknown pada data preparation
 
 ### Univariate Data Analysis
 """
@@ -656,17 +739,23 @@ plt.show()
 
 #Load ulang dataset dan batasi di 15000
 ratings = pd.read_csv('/home/crxtan/Downloads/Movie/ratings.csv')
-ratings = ratings.head(15000)
+ratings = ratings.head(15000).copy()
 print(f"Ratings DataFrame sekarang berisi {len(ratings)} records.")
 movies = pd.read_csv('/home/crxtan/Downloads/Movie/movies.csv')
-movies = movies.head(15000)
+movies = movies.head(15000).copy()
 print(f"Movies DataFrame sekarang berisi {len(movies)} records.")
 
 """Melakukan pemuatan ulang dataset karena pada saat EDA ada sedikit perubahan di dataframe untuk lebih mengenali pola pola yang ada dan membatasi hanya 15000 record untuk modeling nya"""
 
-# Content-Based Recommendation Data Preparation
 # Fill empty genres with 'Unknown'
+movies = movies.dropna(subset=['title']).copy()
 movies['genres'] = movies['genres'].fillna('Unknown')
+movies = movies[movies['genres'] != 'Unknown'].copy()
+print(f"Movies DataFrame after dropping NaN titles: {len(movies)} records.")
+
+"""Kode ini memastikan bahwa DataFrame movies hanya berisi film-film yang memiliki judul yang lengkap dan memiliki informasi genre yang spesifik (bukan 'Unknown'). Ini adalah langkah awal yang krusial dalam pemrosesan data untuk menjamin kualitas dan relevansi data yang akan Anda gunakan."""
+
+# Content-Based Recommendation Data Preparation
 
 # TF-IDF Vectorization
 tfidf = TfidfVectorizer(token_pattern=r"[^|]+")
@@ -856,6 +945,42 @@ Tujuan dan Pentingnya:
   - Bobot yang Setara: Memastikan bahwa tidak ada fitur yang mendominasi yang lain hanya karena skalanya lebih besar. Dalam konteks ini, meskipun hanya ada satu fitur (rating), menormalkannya ke 0-1 adalah praktik yang baik untuk konsistensi dan kompatibilitas dengan arsitektur model yang akan digunakan. Misalnya, jika ingin memprediksi rating, output layer model mungkin menggunakan fungsi aktivasi sigmoid yang menghasilkan nilai antara 0 dan 1, dan normalisasi ini membuat target prediksi cocok dengan rentang output model.
 """
 
+ratings_for_cbf_eval = pd.merge(ratings, movies[['movieId', 'title']], on='movieId', how='left')
+
+
+ratings_for_cbf_eval = ratings_for_cbf_eval[ratings_for_cbf_eval['title'].isin(indices.index)].copy()
+print(f"Ratings for CBF evaluation after filtering invalid titles: {len(ratings_for_cbf_eval)} records.")
+
+train_cbf_eval, test_cbf_eval = train_test_split(
+    ratings_for_cbf_eval, test_size=0.2, random_state=42, stratify=ratings_for_cbf_eval['userId']
+)
+
+# Buat dictionary untuk akses ground truth dan trigger movie yang cepat
+user_test_movies_dict_cbf = test_cbf_eval.groupby('userId')['movieId'].apply(list).to_dict()
+user_train_movies_titles_dict_cbf = train_cbf_eval.groupby('userId')['title'].apply(list).to_dict()
+
+# Ambil user IDs yang akan dievaluasi untuk CBF (user yang ada di kedua set)
+eval_user_ids_cbf = list(set(train_cbf_eval['userId']).intersection(set(test_cbf_eval['userId'])))
+
+print(f"Number of users for CBF evaluation: {len(eval_user_ids_cbf)}")
+print("Content-Based Filtering evaluation data prepared (trigger movies, ground truth).")
+
+"""Kode ini menyiapkan data untuk mengevaluasi sistem rekomendasi Content-Based Filtering (CBF).
+
+Pertama, ia menggabungkan data penilaian film dengan judul film. Kemudian, data ini disaring hanya untuk film yang dikenali model.
+
+Selanjutnya, data dibagi menjadi set pelatihan (80%) dan set pengujian (20%), dengan memastikan setiap pengguna terwakili di keduanya.
+
+Dari set ini, kode membuat dua kamus utama:
+
+  - user_test_movies_dict_cbf: Berisi film yang dilihat pengguna di set pengujian (ini adalah ground truth yang ingin diprediksi sistem).
+  - user_train_movies_titles_dict_cbf: Berisi film yang dilihat pengguna di set pelatihan (ini adalah film pemicu yang akan digunakan model untuk menghasilkan rekomendasi).
+
+Terakhir, kode mengidentifikasi daftar pengguna yang ada di kedua set (pelatihan dan pengujian) agar bisa dievaluasi.
+
+Singkatnya, kode ini membuat "skenario" di mana dataset punya data riwayat tontonan pengguna (untuk melatih model) dan data tontonan "masa depan" pengguna (untuk menguji akurasi rekomendasi model).
+"""
+
 # Prepare features (x) and scaled targets (y_scaled) for the neural network
 x = ratings[['user', 'movie']].values
 y_scaled = rating_scaled
@@ -961,6 +1086,11 @@ def get_recommendations(title, top_n=10):
         return pd.DataFrame()
 
     idx = indices[title]
+    # Pastikan ukuran cosine_sim sesuai dengan jumlah movie
+    if idx >= len(cosine_sim) or idx < 0:
+        print(f"Index {idx} out of bounds for cosine_sim matrix.") # Opsional: uncomment untuk debug
+        return pd.DataFrame()
+
     sim_scores = list(enumerate(cosine_sim[idx]))
     sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
     sim_scores = sim_scores[1:top_n+1]
@@ -973,7 +1103,6 @@ print(movies['title'].unique())
 
 """Melihat value unik di dataframe movies kolom title"""
 
-print("--- Evaluasi Rekomendasi Berbasis Konten (Content-Based) ---")
 print("\nMelakukan inspeksi visual pada rekomendasi:")
 
 # Contoh 1: Rekomendasi untuk 'Jumanji'
@@ -1333,21 +1462,200 @@ Bagian ini menyajikan hasil evaluasi kinerja kedua komponen sistem rekomendasi f
 
 ## **1. Content-Based Filtering (CBF)**
 
-Untuk Content-Based Filtering, evaluasi dilakukan secara **inspeksi visual**, yang secara konseptual menerapkan prinsip **Precision@N**.
+Untuk Content-Based Filtering, evaluasi dilakukan secara kuantitatif dengan metrik kinerja standar.
 
 ### **Metrik Evaluasi yang Digunakan:**
 
-* **Precision@N (Presisi pada N Rekomendasi Teratas):**
-    * **Tujuan:** Mengukur proporsi item relevan di antara N item teratas yang direkomendasikan. Ini memberikan gambaran seberapa banyak rekomendasi yang benar-benar sesuai dengan kriteria relevansi yang ditentukan.
+* **1. Precision@N (Presisi pada N Rekomendasi Teratas)**
+    * **Tujuan:** Mengukur proporsi item yang *benar-benar relevan* di antara **N** item teratas yang direkomendasikan. Ini memberikan gambaran seberapa banyak rekomendasi yang 'tepat sasaran'.
     * **Rumus Konseptual:**
-$$\text{Precision} = \frac{TP}{TP + FP}$$
-        
-        Di mana:
-        * **TP (True Positive):** Jumlah item relevan yang berhasil direkomendasikan dalam N teratas.
-        * **FP (False Positive):** Jumlah item yang direkomendasikan dalam N teratas, tetapi sebenarnya tidak relevan.
-        * **N:** Jumlah rekomendasi teratas yang ditampilkan (dalam kasus ini, 10).
-    * **Cara Metrik Tersebut Bekerja dalam Konteks Ini:**
-        Dalam evaluasi ini, "relevansi" sebuah film ditentukan oleh kemiripan genrenya dengan film referensi. Inspeksi visual berfungsi sebagai cara kualitatif untuk mengukur TP dan FP ini.
+        $$Precision@N = \frac{TP}{TP + FP}$$
+    * **Di mana:**
+        * **TP (True Positive):** Jumlah item relevan yang berhasil direkomendasikan dalam **N** teratas.
+        * **FP (False Positive):** Jumlah item yang direkomendasikan dalam **N** teratas, tetapi sebenarnya *tidak relevan*.
+        * **N:** Jumlah rekomendasi teratas yang ditampilkan (dalam kasus evaluasi ini, **N=10**).
+    * **Konteks Relevansi:** Dalam evaluasi ini, 'relevansi' sebuah item (film/tempat) ditentukan oleh keberadaannya di *set pengujian (ground truth)* pengguna. Artinya, item yang direkomendasikan dianggap relevan jika pengguna memang pernah berinteraksi positif (misalnya, memberi rating tinggi) dengan item tersebut di data pengujian.
+
+* **2. Recall@N (Cakupan pada N Rekomendasi Teratas)**
+    * **Tujuan:** Mengukur proporsi item relevan yang berhasil ditemukan di antara **N** rekomendasi teratas, dari *seluruh item relevan yang seharusnya ditemukan*. Ini menunjukkan seberapa 'lengkap' cakupan rekomendasi terhadap semua item yang relevan bagi pengguna.
+    * **Rumus Konseptual:**
+        $$Recall@N = \frac{TP}{TP + FN}$$
+    * **Di mana:**
+        * **TP (True Positive):** Sama seperti pada Precision@N.
+        * **FN (False Negative):** Jumlah item yang *sebenarnya relevan* (ada di set pengujian pengguna) tetapi *tidak berhasil direkomendasikan* dalam **N** teratas.
+
+* **3. F1-Score@N**
+    * **Tujuan:** Merupakan rata-rata harmonik (harmonic mean) dari Precision@N dan Recall@N. Metrik ini memberikan nilai tunggal yang menyeimbangkan kemampuan sistem untuk memberikan rekomendasi yang akurat (Precision) dan kemampuannya untuk menemukan semua rekomendasi yang relevan (Recall). F1-Score sangat berguna ketika Anda ingin mengevaluasi kedua aspek tersebut secara bersamaan.
+    * **Rumus Konseptual:**
+  $$F1@N = 2 \times \frac{Precision@N \times Recall@N}{Precision@N + Recall@N}$$
+"""
+
+print("\n Starting Content-Based Filtering Evaluation ")
+
+# --- 1. Fungsi untuk Menghitung Precision dan Recall ---
+def calculate_precision_recall_cbf(recommended_movie_ids, actual_movie_ids, top_n):
+
+    # Ambil hanya top_n dari rekomendasi
+    recommended_at_k = set(recommended_movie_ids[:top_n])
+    actual_set = set(actual_movie_ids)
+
+    true_positives = len(recommended_at_k.intersection(actual_set))
+
+    # Precision@k: TP / (TP + FP) = TP / jumlah_rekomendasi_at_k
+    if len(recommended_at_k) == 0:
+        precision = 0.0
+    else:
+        precision = true_positives / len(recommended_at_k)
+
+    # Recall@k: TP / (TP + FN) = TP / jumlah_item_relevan_di_actual_set
+    if len(actual_set) == 0:
+        recall = 0.0
+    else:
+        recall = true_positives / len(actual_set)
+
+    return precision, recall
+
+# --- 2. Evaluasi Model Content-Based Filtering Anda ---
+
+all_precision_cbf = []
+all_recall_cbf = []
+top_n_eval = 10
+
+print(f"Evaluating Content-Based Filtering for {len(eval_user_ids_cbf)} users (Top {top_n_eval} recommendations)...")
+
+for user_id in eval_user_ids_cbf:
+    # Dapatkan film yang ditonton user di training set (untuk memicu rekomendasi)
+    user_train_movie_titles = user_train_movies_titles_dict_cbf.get(user_id, [])
+
+    if not user_train_movie_titles:
+        # print(f"User {user_id} has no movies in training set for CBF trigger. Skipping.") # Opsional: untuk debug
+        continue # Lewati jika user tidak punya film di training set sebagai pemicu
+
+    # Ambil film di training set user sebagai 'trigger' rekomendasi
+    trigger_movie_title = user_train_movie_titles[3]
+
+    # Dapatkan rekomendasi dari model CBF Anda
+    recommended_df = get_recommendations(trigger_movie_title, top_n=top_n_eval)
+
+    if recommended_df.empty:
+        # print(f"No recommendations generated for '{trigger_movie_title}'. Skipping user {user_id}.") # Opsional: untuk debug
+        continue
+
+    recommended_movie_ids = recommended_df['movieId'].tolist()
+
+    # Dapatkan ground truth (film yang sebenarnya ditonton user di test set)
+    actual_movie_ids = user_test_movies_dict_cbf.get(user_id, [])
+
+    if not actual_movie_ids: # Jika user tidak punya film di test set
+        # print(f"User {user_id} has no actual movies in test set. Skipping.") # Opsional: untuk debug
+        continue
+
+    # Hitung Precision dan Recall
+    precision, recall = calculate_precision_recall_cbf(recommended_movie_ids, actual_movie_ids, top_n=top_n_eval)
+
+    all_precision_cbf.append(precision)
+    all_recall_cbf.append(recall)
+
+if all_precision_cbf:
+    avg_precision_cbf = sum(all_precision_cbf) / len(all_precision_cbf)
+    avg_recall_cbf = sum(all_recall_cbf) / len(all_recall_cbf)
+    # Hitung F1-Score
+    f1_score_cbf = 2 * (avg_precision_cbf * avg_recall_cbf) / (avg_precision_cbf + avg_recall_cbf) if (avg_precision_cbf + avg_recall_cbf) > 0 else 0
+
+    print(f"\n--- Results for Content-Based Filtering ---")
+    print(f"Average Precision@{top_n_eval}: {avg_precision_cbf:.4f}")
+    print(f"Average Recall@{top_n_eval}: {avg_recall_cbf:.4f}")
+    print(f"Average F1-Score@{top_n_eval}: {f1_score_cbf:.4f}")
+else:
+    print("Content-Based Filtering evaluation could not be performed. Check data preparation and user distribution.")
+
+# --- 3. Implementasi dan Evaluasi Baseline (Popularity-Based) ---
+print("\n--- Starting Popularity-Based Baseline Evaluation ---")
+
+movie_popularity_df = ratings.groupby('movieId').size().reset_index(name='num_ratings')
+movie_popularity_df = pd.merge(movie_popularity_df, movies[['movieId', 'title']], on='movieId', how='left')
+movie_popularity_df = movie_popularity_df.sort_values(by='num_ratings', ascending=False)
+
+# Dapatkan daftar movieId dari film paling populer
+most_popular_movie_ids = movie_popularity_df['movieId'].tolist()
+
+# Fungsi baseline yang mengembalikan N film paling populer (dalam bentuk movie ID)
+def get_popular_recommendations(top_n=10):
+    return most_popular_movie_ids[:top_n]
+
+all_precision_baseline = []
+all_recall_baseline = []
+
+print(f"Evaluating Popularity Baseline for {len(eval_user_ids_cbf)} users (Top {top_n_eval} recommendations)...")
+
+for user_id in eval_user_ids_cbf: # Gunakan user_ids yang sama dengan Hasilevaluasi CBF
+    # Dapatkan rekomendasi dari baseline (film paling populer)
+    baseline_recommended_ids = get_popular_recommendations(top_n=top_n_eval)
+
+    # Dapatkan ground truth (sama seperti di evaluasi CBF)
+    actual_movie_ids = user_test_movies_dict_cbf.get(user_id, [])
+
+    if not actual_movie_ids or not baseline_recommended_ids:
+        continue
+
+    # Hitung Precision dan Recall
+    precision, recall = calculate_precision_recall_cbf(baseline_recommended_ids, actual_movie_ids, top_n=top_n_eval)
+
+    all_precision_baseline.append(precision)
+    all_recall_baseline.append(recall)
+
+if all_precision_baseline:
+    avg_precision_baseline = sum(all_precision_baseline) / len(all_precision_baseline)
+    avg_recall_baseline = sum(all_recall_baseline) / len(all_recall_baseline)
+    # Hitung F1-Score
+    f1_score_baseline = 2 * (avg_precision_baseline * avg_recall_baseline) / (avg_precision_baseline + avg_recall_baseline) if (avg_precision_baseline + avg_recall_baseline) > 0 else 0
+
+    print(f"\n--- Results for Popularity-Based Baseline ---")
+    print(f"Average Precision@{top_n_eval}: {avg_precision_baseline:.4f}")
+    print(f"Average Recall@{top_n_eval}: {avg_recall_baseline:.4f}")
+    print(f"Average F1-Score@{top_n_eval}: {f1_score_baseline:.4f}")
+else:
+    print("Popularity-Based Baseline evaluation could not be performed.")
+
+print("\n--- Content-Based Filtering Evaluation Complete ---")
+
+"""**Hasil Evaluasi Proyek Sistem Rekomendasi Content-Based Filtering**
+
+Berdasarkan *output* evaluasi yang diberikan, sistem rekomendasi **Content-Based Filtering (CBF)** telah dievaluasi menggunakan metrik **Precision@10**, **Recall@10**, dan **F1-Score@10** terhadap **119 pengguna**, dengan mempertimbangkan 10 rekomendasi teratas (*Top 10*).
+
+Berikut adalah analisis dan interpretasi hasilnya:
+
+**1. Kinerja Content-Based Filtering (CBF)**
+
+* **Average Precision@10: 0.0143**
+    * **Interpretasi:** Ini berarti, rata-rata, hanya sekitar **1.43%** dari 10 rekomendasi teratas yang dihasilkan oleh model CBF adalah film/tempat yang sebenarnya relevan atau disukai oleh pengguna (berdasarkan data uji).
+    * **Implikasi:** Angka ini menunjukkan bahwa model CBF saat ini **sangat rendah akurasinya** dalam memberikan rekomendasi yang tepat sasaran.
+
+* **Average Recall@10: 0.0115**
+    * **Interpretasi:** Rata-rata, model CBF hanya berhasil menangkap sekitar **1.15%** dari semua film/tempat relevan yang seharusnya bisa ditemukan untuk pengguna (yang ada di data uji).
+    * **Implikasi:** Nilai Recall yang sangat rendah ini mengindikasikan bahwa model CBF memiliki **cakupan yang sangat buruk**. Ia gagal menemukan sebagian besar item yang sebenarnya relevan bagi pengguna.
+
+* **Average F1-Score@10: 0.0127**
+    * **Interpretasi:** Sebagai rata-rata harmonik dari Precision dan Recall, nilai ini (sekitar **1.27%**) mengonfirmasi bahwa kinerja keseluruhan model Content-Based Filtering **tidak memuaskan**.
+
+**2. Perbandingan dengan Popularity-Based Baseline**
+
+Untuk mendapatkan konteks kinerja CBF, sangat penting untuk membandingkannya dengan *Popularity-Based Baseline*:
+
+* **Popularity-Based Baseline:**
+    * Average Precision@10: **0.0899**
+    * Average Recall@10: **0.0698**
+    * Average F1-Score@10: **0.0786**
+
+Dari perbandingan ini, dapat disimpulkan dengan jelas bahwa:
+
+* **Model Content-Based Filtering masih jauh kalah dibandingkan dengan *baseline* berbasis popularitas.** Precision@10 dari CBF (0.0143) hanya sekitar seperenam dari *baseline* (0.0899), dan pola serupa terlihat pada Recall dan F1-Score.
+
+**3. Kesimpulan Umum Hasil Evaluasi CBF:**
+
+Secara keseluruhan, hasil evaluasi menunjukkan bahwa **proyek sistem rekomendasi Content-Based Filtering ini, dalam implementasi saat ini, belum efektif**. Meskipun ada sedikit peningkatan dari hasil sebelumnya, kinerja model ini masih sangat lemah dan secara signifikan dikalahkan oleh metode rekomendasi yang jauh lebih sederhana (berbasis popularitas).
+
+Hal ini mengindikasikan bahwa model CBF belum berhasil secara efisien memanfaatkan informasi konten untuk memberikan rekomendasi yang relevan dan personal kepada pengguna. Untuk proyek yang berkelanjutan, fokus utama harus pada perbaikan mendalam terhadap representasi fitur konten dan/atau metode perhitungan kesamaan untuk meningkatkan relevansi yang dihasilkan.
 
 ## Evaluasi Collaborative Filtering (CF)
 
@@ -1418,24 +1726,39 @@ plt.show()
 
 #Conclusion
 
-**Kesimpulan**
+**Kesimpulan Hasil Evaluasi Sistem Rekomendasi (Content-Based Filtering & Collaborative Filtering)**
 
-Proyek ini telah berhasil mengembangkan dan mengevaluasi sistem rekomendasi film hibrida yang menggabungkan kekuatan pendekatan Content-Based Filtering (CBF) dan Collaborative Filtering (CF). Tujuan utama adalah untuk membantu pengguna menavigasi katalog film yang luas dan menemukan rekomendasi yang dipersonalisasi dan relevan, sekaligus mengatasi keterbatasan yang melekat pada metode rekomendasi tunggal.
+Proyek ini bertujuan untuk membangun sistem rekomendasi film yang adaptif dan komprehensif menggunakan pendekatan *Content-Based Filtering* (CBF) dan *Collaborative Filtering* (CF) guna meningkatkan relevansi serta pengalaman personalisasi pengguna.
 
-Berdasarkan hasil evaluasi:
+Evaluasi dilakukan terhadap kedua model dan juga membandingkannya dengan *Popularity-Based Baseline* sebagai tolok ukur.
 
-- Content-Based Filtering (CBF) menunjukkan efektivitas tinggi dalam merekomendasikan film berdasarkan kemiripan konten.
-    - Evaluasi kualitatif melalui inspeksi visual mengonfirmasi bahwa rekomendasi CBF sangat selaras dengan genre film referensi. Misalnya, film-film seperti 'Jumanji' atau 'Toy Story' menghasilkan rekomendasi yang secara konsisten memiliki genre yang sangat mirip (Adventure|Children|Fantasy atau Animation|Children|Comedy).
-    - Hal ini secara konseptual mengindikasikan Precision yang tinggi, di mana sebagian besar item yang direkomendasikan adalah "True Positive" berdasarkan kesamaan genre. Ini membuktikan bahwa sistem CBF efektif dalam menemukan item-item serupa berdasarkan karakteristik intrinsiknya.
+ **1. Kinerja Model Collaborative Filtering (CF)**
 
-Collaborative Filtering (CF) berbasis Neural Network (RecommenderNet) berhasil memprediksi preferensi rating pengguna dengan akurasi yang baik.
+* **Metrik:** Test Loss (MSE) & Test Mean Absolute Error (MAE)
+* **Hasil:**
+    * Test Loss (MSE): **0.0383**
+    * Test Mean Absolute Error (MAE): **0.1526**
+    * Test MAE (skala rating asli): **0.6866**
+* **Interpretasi:**
+    * Nilai MAE sebesar **0.6866 pada skala rating asli (0.5 hingga 5.0)** menunjukkan bahwa, rata-rata, prediksi rating film oleh model CF meleset sekitar 0.6866 poin dari rating sebenarnya yang diberikan pengguna. Angka ini mengindikasikan **tingkat akurasi yang cukup baik dan dapat diterima untuk sebuah sistem rekomendasi**, menunjukkan model CF **efektif dalam memprediksi preferensi pengguna**.
+    * Kurva pelatihan (`Train Loss` vs `Validation Loss` dan `Train MAE` vs `Validation MAE`) menunjukkan bahwa model belajar dengan efektif di awal pelatihan, dengan kurva validasi yang stabil sebelum kemungkinan *overfitting*. Hal ini menandakan bahwa model CF **mampu menangkap pola preferensi pengguna** dengan baik.
 
-   - Model CF dilatih menggunakan embedding pengguna dan film, serta berhasil meminimalkan kesalahan prediksi pada data uji.
-   - Metrik evaluasi menunjukkan:
-       - Test Loss (MSE) sebesar 0.0383 (pada skala rating 0-1).
-       - Test Mean Absolute Error (MAE) sebesar 0.1526 (pada skala rating 0-1).
-       - Yang terpenting, Test MAE (skala rating asli) sebesar 0.6866. Angka ini menunjukkan bahwa, rata-rata, prediksi rating model meleset kurang dari 0.7 poin dari rating asli pengguna pada skala 0.5-5.0. Ini adalah indikator akurasi yang solid dan dapat diterima untuk sistem rekomendasi.
-   - Analisis plot pelatihan (Loss dan MAE per Epoch) juga mengonfirmasi bahwa model belajar dengan efisien meskipun menunjukkan tanda-tanda overfitting yang berhasil ditangani oleh mekanisme Early Stopping, memastikan model yang dihasilkan memiliki kemampuan generalisasi yang optimal.
+**2. Kinerja Model Content-Based Filtering (CBF)**
 
-Dengan akurasi prediksi rating yang terbukti dan kemampuan untuk menyediakan rekomendasi berbasis konten, sistem ini menjadi alat yang efektif untuk meningkatkan keterlibatan pengguna dan mempermudah penemuan film di platform.
+* **Metrik:** Precision@10, Recall@10, F1-Score@10
+* **Hasil:**
+    * Average Precision@10: **0.0143**
+    * Average Recall@10: **0.0115**
+    * Average F1-Score@10: **0.0127**
+* **Interpretasi:**
+    * Kinerja model CBF, bahkan pada level yang dianggap "maksimal" dengan dataset konten yang tersedia (hanya `title` dan `genres`), menunjukkan **tingkat relevansi yang sangat rendah**. Precision@10 hanya sekitar **1.43%**, berarti sangat sedikit rekomendasi yang tepat sasaran.
+    * **Perbandingan dengan Popularity-Based Baseline:** Model CBF **jauh dikalahkan** oleh *baseline* berbasis popularitas (Precision@10: **0.0899**). Ini menegaskan bahwa fitur konten yang tersedia tidak cukup kaya untuk mendukung personalisasi yang efektif atau mengungguli rekomendasi generik.
+
+**3. Kesimpulan Komprehensif Proyek Sistem Rekomendasi**
+
+* **Pencapaian Tujuan "Komprehensif & Adaptif":** Proyek ini berhasil membangun dua pendekatan rekomendasi yang berbeda (CBF dan CF).
+* **Kelebihan dan Kekurangan Pendekatan:**
+    * **Collaborative Filtering:** Menjadi tulang punggung sistem rekomendasi, sangat efektif dalam mempersonalisasi rekomendasi dan memprediksi preferensi pengguna secara akurat (dibuktikan dengan MAE yang rendah). Kelemahannya adalah masalah *cold start* untuk item baru (film tanpa rating).
+    * **Content-Based Filtering:** Dengan data konten yang terbatas, CBF menunjukkan kinerja yang sangat rendah dan tidak efektif untuk personalisasi umum atau peningkatan relevansi secara luas. Kelebihannya adalah potensinya untuk merekomendasikan item-item baru (yang belum memiliki rating sama sekali) yang tidak dapat ditangani oleh CF.
+* **Peran CBF yang Spesifik:** Mengingat CBF mencapai kinerja maksimalnya yang rendah, perannya dalam sistem akan menjadi sangat spesifik, yaitu sebagai pelengkap untuk menangani masalah **rekomendasi *cold start* untuk item baru**, di mana CF tidak memiliki data untuk beroperasi. Meskipun demikian, akurasinya dalam peran ini tetap terbatas.
 """
