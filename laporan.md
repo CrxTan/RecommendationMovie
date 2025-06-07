@@ -486,7 +486,8 @@ Data yang digunakan dalam proyek ini adalah dataset rating dan metadata film dar
     ### Multivariate Analysis EDA
 
     * **Heatmap Korelasi variabel Numerik**
-      ![Multivariate](https://github.com/user-attachments/assets/1233bf60-1caa-468b-81af-c91e35bd9792)
+
+        ![Multivariate](https://github.com/user-attachments/assets/1233bf60-1caa-468b-81af-c91e35bd9792)
 
       Analisis dan Insight:
 
@@ -533,12 +534,29 @@ Data yang digunakan dalam proyek ini adalah dataset rating dan metadata film dar
 
 Tahap Data Preparation adalah langkah krusial untuk mengubah data mentah menjadi format yang sesuai dan optimal untuk proses *modeling* sistem rekomendasi, disini saya melakukan efisiensi dan pembatasan dataset menjadi 15000 records saja dan memuat kembali datasetnya. Teknik-teknik yang diterapkan dan alasannya adalah sebagai berikut:
 
-1.  **Pengisian Nilai Kosong pada Genre (`movies['genres'].fillna('Unknown')`)**
-    * **Teknik:** Imputasi dengan string kosong.
-    * **Proses:** Mengganti setiap nilai `NaN` (Not a Number) dalam kolom `genres` di DataFrame `movies` dengan string kosong (`''`).
-    * **Alasan:** `TfidfVectorizer` (yang digunakan untuk Content-Based Filtering) mengharapkan input berupa string. Nilai `NaN` dapat menyebabkan error atau perilaku yang tidak terduga. Menggantinya dengan string kosong memastikan bahwa setiap entri dapat diproses.
 
-2.  **TF-IDF Vectorization pada Genre**
+1.  **Menghapus Baris dengan Judul Kosong (movies = movies.dropna(subset=['title']).copy())**
+    * **Teknik:** Penghapusan Baris (Row Dropping).
+    * **Proses:** Mengidentifikasi dan menghapus setiap baris dari DataFrame movies di mana nilai pada kolom title adalah NaN (Not a Number/kosong).
+    * **Alasan:**
+        * **Integritas Data:** Film tanpa judul tidak relevan atau tidak dapat diidentifikasi dengan baik dalam sistem rekomendasi, terutama jika judul digunakan sebagai kunci identifikasi atau fitur.
+        * **Mencegah Error:** Operasi selanjutnya yang bergantung pada keberadaan judul (misalnya penggabungan data, pencarian) dapat mengalami error jika ada nilai kosong.
+    
+2.  **Pengisian Nilai Kosong pada Genre (`movies['genres'].fillna('Unknown')`)**
+    * **Teknik:** Imputasi dengan string spesifik.
+    * **Proses:** Mengganti setiap nilai `NaN` (Not a Number) dalam kolom `genres` di DataFrame `movies` dengan string kosong (`''`).
+    * **Alasan:**
+         * **Konsistensi Data:** Memastikan tidak ada nilai NaN yang tersisa di kolom genres, membuat data lebih seragam.
+         * **Persiapan untuk Filtering:** Langkah ini sangat penting karena akan diikuti oleh langkah filtering yang akan menghapus semua entri dengan genre 'Unknown'. Dengan mengisi NaN menjadi 'Unknown' terlebih dahulu, kita memastikan bahwa film dengan genre yang awalnya kosong juga akan ikut dihapus pada langkah selanjutnya.
+         
+3.  **Menghapus Film dengan Genre 'Unknown' (movies = movies[movies['genres'] != 'Unknown'].copy())**
+    * **Teknik:** Filtering Baris (Row Filtering).
+    * **Proses:** Memilih dan hanya menyimpan baris-baris dari DataFrame movies di mana nilai pada kolom genres TIDAK SAMA DENGAN string 'Unknown'.
+    * **Alasan:**
+        * **Fokus pada Data Relevan:** Dalam konteks Content-Based Filtering, genre adalah fitur konten utama. Film dengan genre 'Unknown' (baik itu memang asalnya 'Unknown' atau hasil imputasi dari NaN) tidak akan memberikan informasi konten yang berarti untuk menghitung kesamaan. Menghapusnya memastikan bahwa model hanya dilatih dan diuji dengan film yang memiliki data genre yang dapat digunakan.
+        * **Meningkatkan Kualitas Rekomendasi:** Dengan hanya menggunakan film yang memiliki genre spesifik, model dapat membuat rekomendasi yang lebih bermakna.
+
+4.  **TF-IDF Vectorization pada Genre**
     * **Teknik:** *Text Vectorization* menggunakan TF-IDF (Term Frequency-Inverse Document Frequency).
     * **Proses:**
         * `TfidfVectorizer(token_pattern=r"[^|]+")` diinisialisasi untuk memecah genre yang dipisahkan oleh `|` (pipa) menjadi token terpisah.
@@ -547,17 +565,17 @@ Tahap Data Preparation adalah langkah krusial untuk mengubah data mentah menjadi
         * **Kuantifikasi Teks:** Mengubah data teks (genre) menjadi format numerik yang dapat digunakan oleh algoritma machine learning.
         * **Pembobotan Relevansi:** TF-IDF memberikan bobot yang lebih tinggi pada genre yang unik dan penting untuk suatu film (muncul sering di film tersebut tetapi jarang di film lain), membantu mengidentifikasi karakteristik genre yang paling membedakan.
 
-3.  **Perhitungan Cosine Similarity**
+5.  **Perhitungan Cosine Similarity**
     * **Teknik:** Penghitungan metrik kesamaan.
     * **Proses:** Menggunakan `cosine_similarity(tfidf_matrix, tfidf_matrix)` untuk menghitung matriks kesamaan kosinus antar setiap pasangan film berdasarkan vektor TF-IDF genre mereka. Hasilnya adalah `cosine_sim`.
     * **Alasan:** Matriks ini adalah inti dari Content-Based Filtering. Ini mengukur seberapa mirip profil genre antara dua film, yang kemudian digunakan untuk merekomendasikan film serupa.
 
-4.  **Pemetaan Judul ke Indeks (`indices`)**
+6.  **Pemetaan Judul ke Indeks (`indices`)**
     * **Teknik:** Pembuatan kamus/peta.
     * **Proses:** Membuat `pandas.Series` (`indices`) di mana indeksnya adalah judul film dan nilainya adalah indeks numerik film dalam DataFrame `movies`. `.drop_duplicates()` digunakan untuk menangani judul film yang mungkin sama.
     * **Alasan:** Memungkinkan pencarian cepat indeks film berdasarkan judulnya, yang diperlukan untuk mengakses skor kesamaan dalam `cosine_sim` dan informasi film dalam `movies_df`.
 
-5.  **Label Encoding untuk User ID dan Movie ID**
+7.  **Label Encoding untuk User ID dan Movie ID**
     * **Teknik:** *Categorical Feature Encoding* menggunakan `LabelEncoder`.
     * **Proses:**
         * `user_enc = LabelEncoder()` dan `movie_enc = LabelEncoder()` diinisialisasi.
@@ -566,14 +584,52 @@ Tahap Data Preparation adalah langkah krusial untuk mengubah data mentah menjadi
         * **Persyaratan Model:** Model Neural Network, khususnya *embedding layers*, memerlukan input integer yang berurutan dan dimulai dari 0 sebagai indeks. ID asli pengguna atau film seringkali tidak berurutan atau terlalu besar.
         * **Efisiensi:** Menghemat memori dan mempercepat komputasi dalam model dengan menggunakan indeks yang lebih kecil dan padat.
 
-6.  **Skalasi Min-Max pada Rating (`rating_scaled`)**
+8.  **Skalasi Min-Max pada Rating (`rating_scaled`)**
     * **Teknik:** Normalisasi data.
     * **Proses:** Mengubah nilai rating asli (`ratings['rating']`) ke rentang antara 0 dan 1 menggunakan rumus: `X_scaled = (X - X_min) / (X_max - X_min)`.
     * **Alasan:**
         * **Persyaratan Model Neural Network:** Banyak algoritma ML, terutama jaringan saraf, bekerja lebih baik ketika fitur input dan target output dinormalisasi. Ini membantu proses optimisasi (mencegah *exploding/vanishing gradients*) dan mempercepat konvergensi.
         * **Kompatibilitas Fungsi Aktivasi:** Output layer model menggunakan fungsi aktivasi `sigmoid` yang menghasilkan nilai antara 0 dan 1, sehingga normalisasi target ke rentang yang sama sangat penting.
 
-7.  **Pembagian Data (Train-Test Split)**
+9.  **Menggabungkan Rating dengan Judul Film (ratings_for_cbf_eval = pd.merge(ratings, movies[['movieId', 'title']], on='movieId', how='left'))**
+    * **Teknik:** Penggabungan DataFrame (DataFrame Merging).
+    * **Proses:** Menggabungkan DataFrame ratings (yang berisi catatan penilaian pengguna terhadap film berdasarkan movieId) dengan subset DataFrame movies yang hanya berisi movieId dan title. Penggabungan dilakukan berdasarkan kolom movieId dengan metode how='left', memastikan semua entri dari ratings dipertahankan.
+    * **Alasan:** Untuk menambahkan informasi title (judul film) ke setiap catatan penilaian. Judul film ini penting karena akan digunakan dalam langkah selanjutnya untuk memfilter rating berdasarkan film yang kontennya sudah diproses dan dikenali oleh model Content-Based Filtering.
+
+10. **Memfilter Rating untuk Judul yang Valid (ratings_for_cbf_eval = ratings_for_cbf_eval[ratings_for_cbf_eval['title'].isin(indices.index)].copy())**
+    * **Teknik:** Filtering Baris (Row Filtering) Berbasis Kondisi.
+    * **Proses:** Memilih dan hanya menyimpan baris-baris dari DataFrame ratings_for_cbf_eval di mana title film yang terkait ada di dalam indices.index. indices.index adalah daftar judul film yang telah diproses kontennya (misalnya, yang digunakan untuk membangun cosine_sim_matrix atau TF-IDF).
+    * **Alasan:** Untuk memastikan bahwa data rating yang akan digunakan untuk evaluasi hanya mencakup film-film yang metadata kontennya telah siap dan dapat diproses oleh model Content-Based Filtering. Ini mencegah evaluasi pada film yang tidak memiliki representasi konten yang valid atau tidak dikenali oleh model. `.copy()` digunakan untuk menghindari SettingWithCopyWarning.
+
+11. **Membagi Data Evaluasi Menjadi Set Pelatihan dan Pengujian (train_cbf_eval, test_cbf_eval = train_test_split(...))**
+
+    * **Teknik:** Pembagian Data (Train-Test Split).
+    * **Proses:** Membagi DataFrame ratings_for_cbf_eval menjadi dua subset:
+        * **train_cbf_eval (80% dari data):** Akan digunakan untuk menyediakan "film pemicu" (trigger movies) yang diketahui oleh pengguna, tempat model CBF akan belajar merekomendasikan item serupa.
+        * **test_cbf_eval (20% dari data):** Akan digunakan sebagai ground truth atau data pengujian untuk memverifikasi apakah rekomendasi yang dihasilkan model itu akurat dan relevan.
+    * **random_state=42:** Menjamin bahwa pembagian data ini akan menghasilkan hasil yang sama setiap kali kode dijalankan, membuat eksperimen dapat direproduksi.
+    * ****stratify=ratings_for_cbf_eval['userId']:** Memastikan bahwa proporsi setiap userId (pengguna) dipertahankan kurang lebih sama di kedua set (pelatihan dan pengujian). Ini penting agar tidak ada pengguna yang hanya ada di satu set, yang akan menyulitkan evaluasi.
+    * **Alasan:** Ini adalah praktik standar dalam evaluasi model machine learning untuk mengukur kinerja model pada data yang belum pernah dilihatnya, mensimulasikan skenario dunia nyata.
+   
+12. **Membuat Kamus Film Uji (Ground Truth) per Pengguna (user_test_movies_dict_cbf = test_cbf_eval.groupby('userId')['movieId'].apply(list).to_dict())**
+
+    * **Teknik:** Agregasi Data dan Pembentukan Kamus.
+    * **Proses:** Mengelompokkan DataFrame test_cbf_eval berdasarkan userId dan membuat daftar semua movieId yang telah dinilai oleh setiap pengguna di set pengujian. Hasilnya disimpan dalam format kamus Python.
+    * **Alasan:** Kamus ini berfungsi sebagai ground truth atau "jawaban benar" untuk evaluasi. Untuk setiap pengguna yang dievaluasi, daftar film ini adalah target yang diharapkan ditemukan oleh sistem rekomendasi di antara rekomendasinya.
+
+13. **Membuat Kamus Judul Film Pelatihan (Trigger Movies) per Pengguna (user_train_movies_titles_dict_cbf = train_cbf_eval.groupby('userId')['title'].apply(list).to_dict())**
+
+    * **Teknik:** Agregasi Data dan Pembentukan Kamus.
+    * **Proses:** Mengelompokkan DataFrame train_cbf_eval berdasarkan userId dan membuat daftar semua title film yang telah dinilai oleh setiap pengguna di set pelatihan. Hasilnya disimpan dalam format kamus Python.
+    * **Alasan:** Kamus ini berisi daftar film pemicu (trigger movies). Dalam Content-Based Filtering, model akan menggunakan film-film yang disukai pengguna di set pelatihan ini (berdasarkan judulnya) untuk menemukan dan merekomendasikan film lain yang serupa.
+
+14. **Mengidentifikasi Pengguna untuk Evaluasi (eval_user_ids_cbf = list(set(train_cbf_eval['userId']).intersection(set(test_cbf_eval['userId']))))**
+
+    * **Teknik:** Operasi Himpunan (Set Operations).
+    * **Proses:** Mengambil daftar unik userId dari set pelatihan dan set pengujian, lalu mencari irisan (intersection) dari kedua daftar tersebut. Hasilnya adalah daftar userId yang muncul di kedua set.
+    * **Alasan:** Evaluasi kinerja rekomendasi hanya dapat dilakukan untuk pengguna yang memiliki riwayat interaksi di set pelatihan (sebagai dasar rekomendasi) dan juga memiliki interaksi di set pengujian (untuk memverifikasi relevansi rekomendasi). Pengguna yang hanya ada di salah satu set tidak dapat dievaluasi dengan metode ini.
+
+15.  **Pembagian Data (Train-Test Split)**
     * **Teknik:** Pemisahan dataset.
     * **Proses:** Menggunakan `train_test_split(x, y_scaled, test_size=0.2, random_state=42)` untuk membagi data pasangan pengguna-film (`x`) dan rating yang diskalakan (`y_scaled`) menjadi set pelatihan (80%) dan set pengujian (20%).
     * **Alasan:**
@@ -699,27 +755,64 @@ Top-10 Rekomendasi untuk User ID: 84
 
 ### **Content Based Filtering (CBF)**
 
-Untuk Content-Based Filtering, evaluasi dilakukan secara **inspeksi visual**, yang secara konseptual menerapkan prinsip **Precision@N**.
+UUntuk Content-Based Filtering, evaluasi dilakukan secara kuantitatif dengan metrik kinerja standar.
 
-**Metrik Evaluasi yang Digunakan:**
+### **Metrik Evaluasi yang Digunakan:**
 
-* **Precision@N (Presisi pada N Rekomendasi Teratas):**
-    * **Tujuan:** Mengukur proporsi item relevan di antara N item teratas yang direkomendasikan. Ini memberikan gambaran seberapa banyak rekomendasi yang benar-benar sesuai dengan kriteria relevansi yang ditentukan.
+* **1. Precision@N (Presisi pada N Rekomendasi Teratas)**
+    * **Tujuan:** Mengukur proporsi item yang *benar-benar relevan* di antara **N** item teratas yang direkomendasikan. Ini memberikan gambaran seberapa banyak rekomendasi yang 'tepat sasaran'.
     * **Rumus Konseptual:**
-$$\text{Precision} = \frac{TP}{TP + FP}$$
-        
-        Di mana:
-        * **TP (True Positive):** Jumlah item relevan yang berhasil direkomendasikan dalam N teratas.
-        * **FP (False Positive):** Jumlah item yang direkomendasikan dalam N teratas, tetapi sebenarnya tidak relevan.
-        * **N:** Jumlah rekomendasi teratas yang ditampilkan (dalam kasus ini, 10).
-    * **Cara Metrik Tersebut Bekerja dalam Konteks Ini:**
-        Dalam evaluasi ini, "relevansi" sebuah film ditentukan oleh kemiripan genrenya dengan film referensi. Inspeksi visual berfungsi sebagai cara kualitatif untuk mengukur TP dan FP ini.
+        $$Precision@N = \frac{TP}{TP + FP}$$
+    * **Di mana:**
+        * **TP (True Positive):** Jumlah item relevan yang berhasil direkomendasikan dalam **N** teratas.
+        * **FP (False Positive):** Jumlah item yang direkomendasikan dalam **N** teratas, tetapi sebenarnya *tidak relevan*.
+        * **N:** Jumlah rekomendasi teratas yang ditampilkan (dalam kasus evaluasi ini, **N=10**).
+    * **Konteks Relevansi:** Dalam evaluasi ini, 'relevansi' sebuah item (film/tempat) ditentukan oleh keberadaannya di *set pengujian (ground truth)* pengguna. Artinya, item yang direkomendasikan dianggap relevan jika pengguna memang pernah berinteraksi positif (misalnya, memberi rating tinggi) dengan item tersebut di data pengujian.
 
-**Hasil Proyek Berdasarkan Metrik Evaluasi (Inspeksi Visual):**
-Melalui inspeksi visual pada daftar Top-10 rekomendasi yang dihasilkan oleh model CBF untuk film-film referensi (misalnya, 'Jumanji (1995)' dan 'Toy Story (1995)'), hasilnya menunjukkan tingkat relevansi genre yang tinggi. Film-film yang direkomendasikan secara konsisten memiliki genre yang sangat mirip dengan film referensinya.
+* **2. Recall@N (Cakupan pada N Rekomendasi Teratas)**
+    * **Tujuan:** Mengukur proporsi item relevan yang berhasil ditemukan di antara **N** rekomendasi teratas, dari *seluruh item relevan yang seharusnya ditemukan*. Ini menunjukkan seberapa 'lengkap' cakupan rekomendasi terhadap semua item yang relevan bagi pengguna.
+    * **Rumus Konseptual:**
+        $$Recall@N = \frac{TP}{TP + FN}$$
+    * **Di mana:**
+        * **TP (True Positive):** Sama seperti pada Precision@N.
+        * **FN (False Negative):** Jumlah item yang *sebenarnya relevan* (ada di set pengujian pengguna) tetapi *tidak berhasil direkomendasikan* dalam **N** teratas.
 
-  - Contoh: Untuk 'Jumanji' (Adventure|Children|Fantasy), rekomendasi Top-10 banyak berisi film-film dengan genre yang sama atau serupa (seperti 'The Indian in the Cupboard' yang juga Adventure|Children|Fantasy). Demikian pula untuk 'Toy Story', rekomendasi banyak mengandung genre 'Animation' dan 'Children'.
-  - Interpretasi: Secara kualitatif, observasi ini mengindikasikan bahwa sistem CBF memiliki Precision yang tinggi. Ini berarti sebagian besar rekomendasi yang disajikan adalah "True Positive" berdasarkan kesamaan genre, menunjukkan bahwa sistem efektif dalam menemukan item serupa berdasarkan atribut kontennya.
+* **3. F1-Score@N**
+    * **Tujuan:** Merupakan rata-rata harmonik (harmonic mean) dari Precision@N dan Recall@N. Metrik ini memberikan nilai tunggal yang menyeimbangkan kemampuan sistem untuk memberikan rekomendasi yang akurat (Precision) dan kemampuannya untuk menemukan semua rekomendasi yang relevan (Recall). F1-Score sangat berguna ketika Anda ingin mengevaluasi kedua aspek tersebut secara bersamaan.
+    * **Rumus Konseptual:**
+  $$F1@N = 2 \times \frac{Precision@N \times Recall@N}{Precision@N + Recall@N}$$
+
+**Hasil Evaluasi Proyek Sistem Rekomendasi Content-Based Filtering**
+
+Berdasarkan *output* evaluasi yang diberikan, sistem rekomendasi **Content-Based Filtering (CBF)** telah dievaluasi menggunakan metrik **Precision@10**, **Recall@10**, dan **F1-Score@10** terhadap **119 pengguna**, dengan mempertimbangkan 10 rekomendasi teratas (*Top 10*).
+
+Berikut adalah analisis dan interpretasi hasilnya:
+
+**1. Kinerja Content-Based Filtering (CBF)**
+
+* **Average Precision@10: 0.0143**
+    * **Interpretasi:** Ini berarti, rata-rata, hanya sekitar **1.43%** dari 10 rekomendasi teratas yang dihasilkan oleh model CBF adalah film/tempat yang sebenarnya relevan atau disukai oleh pengguna (berdasarkan data uji).
+    * **Implikasi:** Angka ini menunjukkan bahwa model CBF saat ini **sangat rendah akurasinya** dalam memberikan rekomendasi yang tepat sasaran.
+
+* **Average Recall@10: 0.0115**
+    * **Interpretasi:** Rata-rata, model CBF hanya berhasil menangkap sekitar **1.15%** dari semua film/tempat relevan yang seharusnya bisa ditemukan untuk pengguna (yang ada di data uji).
+    * **Implikasi:** Nilai Recall yang sangat rendah ini mengindikasikan bahwa model CBF memiliki **cakupan yang sangat buruk**. Ia gagal menemukan sebagian besar item yang sebenarnya relevan bagi pengguna.
+
+* **Average F1-Score@10: 0.0127**
+    * **Interpretasi:** Sebagai rata-rata harmonik dari Precision dan Recall, nilai ini (sekitar **1.27%**) mengonfirmasi bahwa kinerja keseluruhan model Content-Based Filtering **tidak memuaskan**.
+
+**2. Perbandingan dengan Popularity-Based Baseline**
+
+Untuk mendapatkan konteks kinerja CBF, sangat penting untuk membandingkannya dengan *Popularity-Based Baseline*:
+
+* **Popularity-Based Baseline:**
+    * Average Precision@10: **0.0899**
+    * Average Recall@10: **0.0698**
+    * Average F1-Score@10: **0.0786**
+
+Dari perbandingan ini, dapat disimpulkan dengan jelas bahwa:
+
+* **Model Content-Based Filtering masih jauh kalah dibandingkan dengan *baseline* berbasis popularitas.** Precision@10 dari CBF (0.0143) hanya sekitar seperenam dari *baseline* (0.0899), dan pola serupa terlihat pada Recall dan F1-Score.
 
 ### **Collaborative Filtering (CBF)**
 
@@ -756,26 +849,41 @@ Interpretasi Hasil:
 
 ## Conclusion
 
-**Kesimpulan**
+**Kesimpulan Hasil Evaluasi Sistem Rekomendasi (Content-Based Filtering & Collaborative Filtering)**
 
-Proyek ini telah berhasil mengembangkan dan mengevaluasi sistem rekomendasi film hibrida yang menggabungkan kekuatan pendekatan Content-Based Filtering (CBF) dan Collaborative Filtering (CF). Tujuan utama adalah untuk membantu pengguna menavigasi katalog film yang luas dan menemukan rekomendasi yang dipersonalisasi dan relevan, sekaligus mengatasi keterbatasan yang melekat pada metode rekomendasi tunggal.
+Proyek ini bertujuan untuk membangun sistem rekomendasi film yang adaptif dan komprehensif menggunakan pendekatan *Content-Based Filtering* (CBF) dan *Collaborative Filtering* (CF) guna meningkatkan relevansi serta pengalaman personalisasi pengguna.
 
-Berdasarkan hasil evaluasi:
+Evaluasi dilakukan terhadap kedua model dan juga membandingkannya dengan *Popularity-Based Baseline* sebagai tolok ukur.
 
-- Content-Based Filtering (CBF) menunjukkan efektivitas tinggi dalam merekomendasikan film berdasarkan kemiripan konten.
-    - Evaluasi kualitatif melalui inspeksi visual mengonfirmasi bahwa rekomendasi CBF sangat selaras dengan genre film referensi. Misalnya, film-film seperti 'Jumanji' atau 'Toy Story' menghasilkan rekomendasi yang secara konsisten memiliki genre yang sangat mirip (Adventure|Children|Fantasy atau Animation|Children|Comedy).
-    - Hal ini secara konseptual mengindikasikan Precision yang tinggi, di mana sebagian besar item yang direkomendasikan adalah "True Positive" berdasarkan kesamaan genre. Ini membuktikan bahwa sistem CBF efektif dalam menemukan item-item serupa berdasarkan karakteristik intrinsiknya.
+ **1. Kinerja Model Collaborative Filtering (CF)**
 
-Collaborative Filtering (CF) berbasis Neural Network (RecommenderNet) berhasil memprediksi preferensi rating pengguna dengan akurasi yang baik.
+* **Metrik:** Test Loss (MSE) & Test Mean Absolute Error (MAE)
+* **Hasil:**
+    * Test Loss (MSE): **0.0383**
+    * Test Mean Absolute Error (MAE): **0.1526**
+    * Test MAE (skala rating asli): **0.6866**
+* **Interpretasi:**
+    * Nilai MAE sebesar **0.6866 pada skala rating asli (0.5 hingga 5.0)** menunjukkan bahwa, rata-rata, prediksi rating film oleh model CF meleset sekitar 0.6866 poin dari rating sebenarnya yang diberikan pengguna. Angka ini mengindikasikan **tingkat akurasi yang cukup baik dan dapat diterima untuk sebuah sistem rekomendasi**, menunjukkan model CF **efektif dalam memprediksi preferensi pengguna**.
+    * Kurva pelatihan (`Train Loss` vs `Validation Loss` dan `Train MAE` vs `Validation MAE`) menunjukkan bahwa model belajar dengan efektif di awal pelatihan, dengan kurva validasi yang stabil sebelum kemungkinan *overfitting*. Hal ini menandakan bahwa model CF **mampu menangkap pola preferensi pengguna** dengan baik.
 
-   - Model CF dilatih menggunakan embedding pengguna dan film, serta berhasil meminimalkan kesalahan prediksi pada data uji.
-   - Metrik evaluasi menunjukkan:
-       - Test Loss (MSE) sebesar 0.0383 (pada skala rating 0-1).
-       - Test Mean Absolute Error (MAE) sebesar 0.1526 (pada skala rating 0-1).
-       - Yang terpenting, Test MAE (skala rating asli) sebesar 0.6866. Angka ini menunjukkan bahwa, rata-rata, prediksi rating model meleset kurang dari 0.7 poin dari rating asli pengguna pada skala 0.5-5.0. Ini adalah indikator akurasi yang solid dan dapat diterima untuk sistem rekomendasi.
-   - Analisis plot pelatihan (Loss dan MAE per Epoch) juga mengonfirmasi bahwa model belajar dengan efisien meskipun menunjukkan tanda-tanda overfitting yang berhasil ditangani oleh mekanisme Early Stopping, memastikan model yang dihasilkan memiliki kemampuan generalisasi yang optimal.
+**2. Kinerja Model Content-Based Filtering (CBF)**
 
-Dengan akurasi prediksi rating yang terbukti dan kemampuan untuk menyediakan rekomendasi berbasis konten, sistem ini menjadi alat yang efektif untuk meningkatkan keterlibatan pengguna dan mempermudah penemuan film di platform.
+* **Metrik:** Precision@10, Recall@10, F1-Score@10
+* **Hasil:**
+    * Average Precision@10: **0.0143**
+    * Average Recall@10: **0.0115**
+    * Average F1-Score@10: **0.0127**
+* **Interpretasi:**
+    * Kinerja model CBF, bahkan pada level yang dianggap "maksimal" dengan dataset konten yang tersedia (hanya `title` dan `genres`), menunjukkan **tingkat relevansi yang sangat rendah**. Precision@10 hanya sekitar **1.43%**, berarti sangat sedikit rekomendasi yang tepat sasaran.
+    * **Perbandingan dengan Popularity-Based Baseline:** Model CBF **jauh dikalahkan** oleh *baseline* berbasis popularitas (Precision@10: **0.0899**). Ini menegaskan bahwa fitur konten yang tersedia tidak cukup kaya untuk mendukung personalisasi yang efektif atau mengungguli rekomendasi generik.
+
+**3. Kesimpulan Komprehensif Proyek Sistem Rekomendasi**
+
+* **Pencapaian Tujuan "Komprehensif & Adaptif":** Proyek ini berhasil membangun dua pendekatan rekomendasi yang berbeda (CBF dan CF).
+* **Kelebihan dan Kekurangan Pendekatan:**
+    * **Collaborative Filtering:** Menjadi tulang punggung sistem rekomendasi, sangat efektif dalam mempersonalisasi rekomendasi dan memprediksi preferensi pengguna secara akurat (dibuktikan dengan MAE yang rendah). Kelemahannya adalah masalah *cold start* untuk item baru (film tanpa rating).
+    * **Content-Based Filtering:** Dengan data konten yang terbatas, CBF menunjukkan kinerja yang sangat rendah dan tidak efektif untuk personalisasi umum atau peningkatan relevansi secara luas. Kelebihannya adalah potensinya untuk merekomendasikan item-item baru (yang belum memiliki rating sama sekali) yang tidak dapat ditangani oleh CF.
+* **Peran CBF yang Spesifik:** Mengingat CBF mencapai kinerja maksimalnya yang rendah, perannya dalam sistem akan menjadi sangat spesifik, yaitu sebagai pelengkap untuk menangani masalah **rekomendasi *cold start* untuk item baru**, di mana CF tidak memiliki data untuk beroperasi. Meskipun demikian, akurasinya dalam peran ini tetap terbatas.
 
 ---
 
